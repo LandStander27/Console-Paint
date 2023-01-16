@@ -1,0 +1,6 @@
+echo Compiling
+
+mkdir bin silent
+
+v paint.v -cc tcc -prod -o ".\bin\paint.exe"
+echo Compiled
