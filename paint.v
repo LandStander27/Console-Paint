@@ -60,6 +60,7 @@ struct App {
 
 		white Point = Point{9,res.y-2}
 		red Point = Point{12, res.y-2}
+		blue Point = Point{15, res.y-2}
 
 		selection_pos Point = Point{9,res.y-2}
 
@@ -146,6 +147,12 @@ fn (mut app App) event(e &tui.Event, w voidptr) {
 							app.deselect(app.selection_pos)
 							app.selection_pos = app.red
 						}
+						app.blue {
+							app.make_selection(app.blue)
+							app.selected = blue
+							app.deselect(app.selection_pos)
+							app.selection_pos = app.blue
+						}
 						else {}
 					}
 					if app.pos.x > app.erase[0].x && app.pos.x < app.erase[1].x && app.pos.y == app.erase[0].y {
@@ -224,6 +231,7 @@ fn (mut app App) make_ribbon() {
 	app.board[6][res.y-2] = yellow
 	app.board[9][res.y-2] = white
 	app.board[12][res.y-2] = red
+	app.board[15][res.y-2] = blue
 }
 
 fn main() {
