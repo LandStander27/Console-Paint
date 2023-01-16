@@ -23,7 +23,9 @@ const (
 	red = tui.Color{255,0,0}
 	blue = tui.Color{0,0,255}
 	white = tui.Color{255,255,255}
-	black = tui.Color{0,0,0}
+	erase = tui.Color{0,0,0}
+
+	gray = tui.Color{200,200,200}
 
 	res = get_initial_size()
 
@@ -48,16 +50,21 @@ struct App {
 		board [][]tui.Color
 
 		last_update time.StopWatch = time.new_stopwatch()
-		last_selection_time time.StopWatch = time.new_stopwatch()
+
+		cleared_time time.StopWatch = time.new_stopwatch()
 
 		selected tui.Color = white
 
-		green Point = Point{3,res.y-7}
-		yellow Point = Point{6, res.y-7}
+		green Point = Point{3,res.y-2}
+		yellow Point = Point{6, res.y-2}
 
-		white Point = Point{3,res.y-4}
+		white Point = Point{9,res.y-2}
+		red Point = Point{12, res.y-2}
 
-		selection_pos Point = Point{3,res.y-4}
+		selection_pos Point = Point{9,res.y-2}
+
+		erase []Point = [Point{res.x-20,res.y-2}, Point{res.x-14,res.y-2}]
+		clear []Point = [Point{res.x-10,res.y-2}, Point{res.x-5,res.y-2}]
 
 }
 
@@ -75,8 +82,14 @@ fn (mut app App) frame() {
 		}
 	}
 
-	app.tui.set_cursor_position(0, 0)
-	app.tui.write(app.pos.str())
+	app.tui.set_cursor_position(app.erase[0].x, app.erase[0].y)
+	app.tui.write(if app.selected == erase { term.bg_white(term.black("Eraser")) } else {"Eraser"})
+
+	app.tui.set_cursor_position(app.clear[0].x, app.clear[0].y)
+	app.tui.write(if app.cleared_time.elapsed().milliseconds() < 50 { term.bg_white(term.black("Clear")) } else {"Clear"})
+
+	// app.tui.set_cursor_position(0, 0)
+	// app.tui.write(app.pos.str())
 
 	if app.last_update.elapsed().milliseconds() > 25 {
 		app.tui.reset()
@@ -87,7 +100,7 @@ fn (mut app App) frame() {
 
 }
 
-fn (mut app App) event(e &tui.Event, x voidptr) {
+fn (mut app App) event(e &tui.Event, w voidptr) {
 
 
 	match e.typ {
@@ -106,20 +119,54 @@ fn (mut app App) event(e &tui.Event, x voidptr) {
 		}
 		.mouse_down {
 			if e.button == .left {
-				if app.last_selection_time.elapsed().milliseconds() > 100 && app.pos != app.selection_pos {
+				if app.pos != app.selection_pos {
 					
-					if app.pos == app.green {
-						app.make_selection(app.green)
-						app.selected = green
-						app.deselect(app.selection_pos)
-						app.selection_pos = app.green
-					} else if app.pos == app.yellow {
-						app.make_selection(app.yellow)
-						app.selected = yellow
-						app.deselect(app.selection_pos)
-						app.selection_pos = app.yellow
+					match app.pos {
+						app.green {
+							app.make_selection(app.green)
+							app.selected = green
+							app.deselect(app.selection_pos)
+							app.selection_pos = app.green
+						}
+						app.yellow {
+							app.make_selection(app.yellow)
+							app.selected = yellow
+							app.deselect(app.selection_pos)
+							app.selection_pos = app.yellow
+						}
+						app.white {
+							app.make_selection(app.white)
+							app.selected = white
+							app.deselect(app.selection_pos)
+							app.selection_pos = app.white
+						}
+						app.red {
+							app.make_selection(app.red)
+							app.selected = red
+							app.deselect(app.selection_pos)
+							app.selection_pos = app.red
+						}
+						else {}
 					}
-					app.last_selection_time.restart()
+					if app.pos.x > app.erase[0].x && app.pos.x < app.erase[1].x && app.pos.y == app.erase[0].y {
+						app.deselect(app.selection_pos)
+						app.selected = erase
+						app.selection_pos = app.erase[0]
+					}
+					if app.pos.x > app.clear[0].x && app.pos.x < app.clear[1].x && app.pos.y == app.clear[0].y {
+						for x in 0..app.board.len {
+							for y in 0..app.board.len {
+								if y < res.y-5 {
+									app.board[x][y] = erase
+								}
+							}
+
+						}
+						app.cleared_time.restart()
+					}
+				}
+				if app.pos.y > res.y-5 {
+					return
 				}
 
 				app.mouse_down = true
@@ -136,48 +183,47 @@ fn (mut app App) event(e &tui.Event, x voidptr) {
 
 fn (mut app App) watch_mouse() {
 	for {
-		if app.mouse_down && (app.pos.x < res.x && app.pos.x > 0 && app.pos.y < res.y && app.pos.y > 0) && app.pos.y < res.y - 10 {
-			app.board[app.pos.x][app.pos.y] = app.selected 
-		}
-		if app.pos.y > res.y - 10 {
-			app.mouse_down = false
+		p := app.pos
+		if app.mouse_down && (p.x < res.x && p.x > 0 && p.y < res.y && p.y > 0) && p.y < res.y - 5 {
+			app.board[p.x][p.y] = app.selected 
 		}
 	}
 }
 
 fn (mut app App) make_selection(point Point) {
-	app.board[point.x-1][point.y+1] = white
-	app.board[point.x][point.y+1] = white
-	app.board[point.x+1][point.y+1] = white
+	app.board[point.x-1][point.y+1] = gray
+	app.board[point.x][point.y+1] = gray
+	app.board[point.x+1][point.y+1] = gray
 
-	app.board[point.x-1][point.y] = white
-	app.board[point.x-1][point.y-1] = white
+	app.board[point.x-1][point.y] = gray
+	app.board[point.x-1][point.y-1] = gray
 
-	app.board[point.x][point.y-1] = white
-	app.board[point.x+1][point.y-1] = white
+	app.board[point.x][point.y-1] = gray
+	app.board[point.x+1][point.y-1] = gray
 
-	app.board[point.x+1][point.y] = white
+	app.board[point.x+1][point.y] = gray
 
 }
 
 fn (mut app App) deselect(point Point) {
-	app.board[point.x-1][point.y+1] = black
-	app.board[point.x][point.y+1] = black
-	app.board[point.x+1][point.y+1] = black
+	app.board[point.x-1][point.y+1] = erase
+	app.board[point.x][point.y+1] = erase
+	app.board[point.x+1][point.y+1] = erase
 
-	app.board[point.x-1][point.y] = black
-	app.board[point.x-1][point.y-1] = black
+	app.board[point.x-1][point.y] = erase
+	app.board[point.x-1][point.y-1] = erase
 
-	app.board[point.x][point.y-1] = black
-	app.board[point.x+1][point.y-1] = black
+	app.board[point.x][point.y-1] = erase
+	app.board[point.x+1][point.y-1] = erase
 
-	app.board[point.x+1][point.y] = black
+	app.board[point.x+1][point.y] = erase
 }
 
 fn (mut app App) make_ribbon() {
-	app.board[3][res.y-7] = green
-	app.board[6][res.y-7] = yellow
-	app.board[3][res.y-4] = white
+	app.board[3][res.y-2] = green
+	app.board[6][res.y-2] = yellow
+	app.board[9][res.y-2] = white
+	app.board[12][res.y-2] = red
 }
 
 fn main() {
@@ -187,13 +233,13 @@ fn main() {
 	for _ in 0..res.x {
 		mut row := []tui.Color{}
 		for _ in 0..res.y {
-			row << black
+			row << erase
 		}
 		app.board << row
 	}
 
 	for x in 0..res.x {
-		app.board[x][app.board[x].len-10] = white
+		app.board[x][app.board[x].len-5] = white
 	}
 
 	app.make_ribbon()
